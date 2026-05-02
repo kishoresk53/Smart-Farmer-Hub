@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required)
+    //   - phone: string
+    //   - role: string (Farmer/Buyer)
+    //   - country: string
+    //   - state: string
+    //   - district: string
+    //   - location: map {lat: number, lng: number}
+    //   - language: string
+    //   - currency: string
+    //   - createdAt: string
+    //
+    // Collection: products
+    // Document ID: {productId}
+    // Fields:
+    //   - sellerId: string (required)
+    //   - sellerName: string
+    //   - sellerPhone: string
+    //   - name: string (required)
+    //   - description: string
+    //   - price: number (required)
+    //   - category: string (required)
+    //   - images: list of strings
+    //   - location: map {lat: number, lng: number, address: string}
+    //   - createdAt: string
+    //
+    // Collection: livestock
+    // Document ID: {livestockId}
+    // Fields:
+    //   - sellerId: string (required)
+    //   - type: string (required)
+    //   - price: number (required)
+    //   - description: string
+    //   - images: list of strings
+    //   - location: map {lat: number, lng: number, address: string}
+    //   - createdAt: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.sellerId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (data.role == 'Farmer' || data.role == 'Buyer');
+    }
+
+    function isValidProduct(data) {
+      return data.sellerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidLivestock(data) {
+      return data.sellerId == request.auth.uid &&
+             data.type is string && data.type.size() > 0 &&
+             data.price is number && data.price >= 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow update: if isDocOwner() && isValidProduct(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /livestock/{livestockId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidLivestock(request.resource.data);
+      allow update: if isDocOwner() && isValidLivestock(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+    
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Smart Farmer Hub",
+  "description": "A comprehensive full-stack platform for farmers and buyers featuring smart crop recommendations, a direct marketplace, AI-powered disease detection, and real-time weather alerts.",
+  "requestFramePermissions": ["camera", "geolocation"]
+}
